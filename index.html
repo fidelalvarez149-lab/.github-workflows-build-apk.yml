@@ -4,9 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0E6B4F">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
 <title>Finanza y Deudas Gregory</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: una sola columna tipo app de bolsillo, con pestañas Hoy / Historial / Deudas. */
 :root {
@@ -116,6 +119,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     <h1>Finanza y Deudas Gregory</h1>
     <p class="sub" id="today-label"></p>
   </header>
+  <div class="warn" id="warn" role="alert" hidden>No se pudo guardar en este navegador (modo privado o sin espacio). Tus datos se perderán al cerrar. Usa Respaldo de datos para copiarlos.</div>
 
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="hoy" aria-selected="true">Hoy</button>
@@ -139,6 +143,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
 <script>
 (function () {
   var KEY = "finanza-deudas-gregory-v1";
+  var MAX = 1e9;
   var nf = new Intl.NumberFormat("es-NI", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   var state = { entries: [], debts: [] };
   var ui = { tab: "hoy", month: ym(new Date()), date: ymd(new Date()), pct: 10, amount: "", toast: "", confirm: null };
@@ -157,13 +162,47 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   function shiftMonth(m, delta) { var d = parseDate(m + "-01"); d.setMonth(d.getMonth() + delta); return ym(d); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-  function load() {
-    try {
-      var raw = localStorage.getItem(KEY);
-      if (raw) { var s = JSON.parse(raw); if (s && Array.isArray(s.entries) && Array.isArray(s.debts)) state = s; }
-    } catch (e) {}
+  var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function clean(s) {
+    if (!s || !Array.isArray(s.entries) || !Array.isArray(s.debts)) return null;
+    var out = { entries: [], debts: [] }, seenDates = {}, seenIds = {};
+    s.entries.forEach(function (e) {
+      if (!e || typeof e.date !== "string" || !DATE_RE.test(e.date) || seenDates[e.date]) return;
+      var a = Number(e.amount); if (!isFinite(a) || a <= 0 || a > MAX) return;
+      seenDates[e.date] = 1;
+      out.entries.push({ date: e.date, amount: round2(a), pct: Number(e.pct) === 20 ? 20 : 10 });
+    });
+    s.debts.forEach(function (d) {
+      if (!d) return;
+      var t = Number(d.total); if (!isFinite(t) || t <= 0 || t > MAX) return;
+      var id = (typeof d.id === "string" && /^[a-z0-9]{1,24}$/i.test(d.id) && !seenIds[d.id]) ? d.id : uid();
+      seenIds[id] = 1;
+      var pays = Array.isArray(d.payments) ? d.payments.filter(function (p) { return p && isFinite(Number(p.amount)) && Number(p.amount) > 0; })
+        .map(function (p) { return { date: (typeof p.date === "string" && DATE_RE.test(p.date)) ? p.date : "", amount: round2(Number(p.amount)) }; }) : [];
+      out.debts.push({ id: id, who: String(d.who == null ? "" : d.who).slice(0, 60) || "Sin nombre", total: round2(t), due: (typeof d.due === "string" && DATE_RE.test(d.due)) ? d.due : "", payments: pays });
+    });
+    return out;
   }
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    var raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) {}
+    if (!raw) return;
+    var s = null;
+    try { s = clean(JSON.parse(raw)); } catch (e) {}
+    if (s) state = s;
+    else { try { localStorage.setItem(KEY + "-corrupto", raw); } catch (e) {} }
+  }
+  function persist() {
+    var ok = true;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { ok = false; }
+    var w = document.getElementById("warn"); if (w) w.hidden = ok;
+    return ok;
+  }
+  function probe() {
+    var ok = true;
+    try { localStorage.setItem(KEY + "-t", "1"); localStorage.removeItem(KEY + "-t"); } catch (e) { ok = false; }
+    var w = document.getElementById("warn"); if (w) w.hidden = ok;
+  }
 
   function summary(m) {
     var list = state.entries.filter(function (e) { return e.date.slice(0, 7) === m; });
@@ -192,7 +231,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var exists = state.entries.some(function (e) { return e.date === ui.date; });
     return '<section class="panel">' +
       '<div class="field"><label class="label" for="in-amount">¿Cuánto gané hoy? (C$)</label>' +
-      '<input id="in-amount" class="big" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="' + esc(ui.amount) + '"></div>' +
+      '<input id="in-amount" class="big" type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="' + esc(ui.amount) + '"></div>' +
       '<div class="field"><span class="label">Apartar para el fondo</span>' +
       '<div class="seg"><button data-pct="10" aria-pressed="' + (ui.pct === 10) + '">10%</button><button data-pct="20" aria-pressed="' + (ui.pct === 20) + '">20%</button></div></div>' +
       '<div class="split"><div><span class="label">Gané</span><span class="num" id="p-earn">' + money(valid ? amt : 0) + '</span></div>' +
@@ -235,7 +274,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
         '<div class="amt"><span class="num">' + money(left) + '</span><div>' +
         (left === 0 ? '<span class="pill ok">Pagada</span>' : late ? '<span class="pill debt">Vencida</span>' : '<span class="pill debt">Pendiente</span>') + '</div></div>' +
         '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
-        (left > 0 ? '<form class="pay" data-id="' + d.id + '"><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Abono en C$" aria-label="Abono para ' + esc(d.who) + '"><button class="btn small" type="submit">Abonar</button></form>' : '') +
+        (left > 0 ? '<form class="pay" data-id="' + d.id + '"><input type="number" inputmode="decimal" min="0" step="any" placeholder="Abono en C$" aria-label="Abono para ' + esc(d.who) + '"><button class="btn small" type="submit">Abonar</button></form>' : '') +
         '<div class="actions"><button class="link danger" data-action="del-debt" data-id="' + d.id + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar deuda") + '</button></div></li>';
     }).join("");
     return '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
@@ -243,7 +282,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
       '<section class="panel"><h2>Agregar deuda</h2>' +
       '<form id="debt-form" class="panel" style="border:0;padding:0">' +
       '<div class="field"><label class="label" for="d-who">A quién le debo</label><input id="d-who" type="text" maxlength="60" placeholder="Ej: Tienda, amigo, banco" required></div>' +
-      '<div class="field"><label class="label" for="d-total">Monto (C$)</label><input id="d-total" type="number" inputmode="decimal" min="0.01" step="0.01" required></div>' +
+      '<div class="field"><label class="label" for="d-total">Monto (C$)</label><input id="d-total" type="number" inputmode="decimal" min="0.01" step="any" required></div>' +
       '<div class="field"><label class="label" for="d-due">Fecha límite (opcional)</label><input id="d-due" type="date"></div>' +
       '<button class="btn" type="submit">Guardar deuda</button></form></section>';
   }
@@ -261,17 +300,25 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     document.getElementById("p-save").textContent = money(ap);
     document.getElementById("p-left").textContent = money(valid ? amt - ap : 0);
   }
-  function resetConfirmSoon() { clearTimeout(resetConfirmSoon.t); resetConfirmSoon.t = setTimeout(function () { ui.confirm = null; render(); }, 3500); }
+  function armConfirm(btn, key, original) {
+    var prev = armConfirm.btn;
+    if (prev && prev !== btn && prev.isConnected) prev.textContent = armConfirm.orig;
+    armConfirm.btn = btn; armConfirm.orig = original; ui.confirm = key;
+    btn.textContent = "¿Seguro? Toca otra vez";
+    clearTimeout(armConfirm.t);
+    armConfirm.t = setTimeout(function () { if (ui.confirm === key) { ui.confirm = null; if (btn.isConnected) btn.textContent = original; } }, 3500);
+  }
 
   function saveDay() {
     var amt = parseFloat(ui.amount);
     if (!isFinite(amt) || amt <= 0) { ui.toast = "Escribe cuánto ganaste."; render(); return; }
+    if (amt > MAX) { ui.toast = "Ese monto es demasiado grande."; render(); return; }
     if (!ui.date) { ui.toast = "Elige una fecha."; render(); return; }
     amt = round2(amt);
     var existing = state.entries.filter(function (e) { return e.date === ui.date; })[0];
     if (existing) { existing.amount = amt; existing.pct = ui.pct; } else { state.entries.push({ date: ui.date, amount: amt, pct: ui.pct }); }
-    persist();
-    ui.toast = (existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ".";
+    var okSave = persist();
+    ui.toast = (!okSave ? "No se pudo guardar. " : existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ".";
     ui.amount = ""; ui.date = ymd(new Date());
     render();
   }
@@ -290,15 +337,13 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     }
     else if (a === "del-day") {
       var k = "e" + t.dataset.date;
-      if (ui.confirm === k) { state.entries = state.entries.filter(function (x) { return x.date !== t.dataset.date; }); persist(); ui.confirm = null; }
-      else { ui.confirm = k; resetConfirmSoon(); }
-      render();
+      if (ui.confirm === k) { state.entries = state.entries.filter(function (x) { return x.date !== t.dataset.date; }); persist(); ui.confirm = null; render(); }
+      else armConfirm(t, k, "Borrar");
     }
     else if (a === "del-debt") {
       var kd = "d" + t.dataset.id;
-      if (ui.confirm === kd) { state.debts = state.debts.filter(function (x) { return x.id !== t.dataset.id; }); persist(); ui.confirm = null; }
-      else { ui.confirm = kd; resetConfirmSoon(); }
-      render();
+      if (ui.confirm === kd) { state.debts = state.debts.filter(function (x) { return x.id !== t.dataset.id; }); persist(); ui.confirm = null; render(); }
+      else armConfirm(t, kd, "Borrar deuda");
     }
     else if (a === "bk-toggle") bkToggle();
     else if (a === "bk-copy") bkCopy();
@@ -315,14 +360,14 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var f = ev.target;
     if (f.id === "debt-form") {
       var who = document.getElementById("d-who").value.trim(), total = parseFloat(document.getElementById("d-total").value), due = document.getElementById("d-due").value;
-      if (!who || !isFinite(total) || total <= 0) return;
+      if (!who || !isFinite(total) || total <= 0 || total > MAX) return;
       state.debts.push({ id: uid(), who: who, total: round2(total), due: due || "", payments: [] });
       persist(); render();
     } else if (f.classList.contains("pay")) {
       var inp = f.querySelector("input"), v = parseFloat(inp.value);
       if (!isFinite(v) || v <= 0) return;
       var d = state.debts.filter(function (x) { return x.id === f.dataset.id; })[0];
-      if (d) { d.payments.push({ date: ymd(new Date()), amount: round2(v) }); persist(); render(); }
+      if (d) { var rest = round2(d.total - paid(d)); if (rest <= 0) return; d.payments.push({ date: ymd(new Date()), amount: Math.min(round2(v), rest) }); persist(); render(); }
     }
   });
 
@@ -338,15 +383,32 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var legacy = function () { try { document.execCommand("copy") ? ok() : manual(); } catch (e) { manual(); } };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(ok).catch(legacy); else legacy();
   }
+  var bkArmed = false;
   function bkRestore() {
-    try {
-      var s = JSON.parse(document.getElementById("bk-text").value);
-      if (s && Array.isArray(s.entries) && Array.isArray(s.debts)) { state = s; persist(); render(); bkMsg("Respaldo restaurado."); }
-      else bkMsg("Ese texto no es un respaldo de la app.");
-    } catch (e) { bkMsg("Ese texto no es un respaldo de la app."); }
+    var s = null;
+    try { s = clean(JSON.parse(document.getElementById("bk-text").value)); } catch (e) {}
+    if (!s) { bkArmed = false; bkMsg("Ese texto no es un respaldo de la app."); return; }
+    if (!bkArmed) {
+      bkArmed = true; bkMsg("Esto reemplaza todos tus datos actuales. Toca Restaurar otra vez para confirmar.");
+      clearTimeout(bkRestore.t); bkRestore.t = setTimeout(function () { bkArmed = false; }, 6000); return;
+    }
+    bkArmed = false; state = s; persist(); render(); bkMsg("Respaldo restaurado.");
   }
 
-  load(); render();
+  load(); render(); probe();
+
+  window.addEventListener("storage", function (ev) {
+    if (ev.key !== KEY || !ev.newValue) return;
+    try { var s = clean(JSON.parse(ev.newValue)); if (s) { state = s; render(); } } catch (e) {}
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    document.getElementById("today-label").textContent = new Date().toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    if (ui.tab === "hoy" && !ui.amount && ui.date !== ymd(new Date())) { ui.date = ymd(new Date()); ui.toast = ""; render(); }
+  });
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
 })();
 </script>
 </body>
