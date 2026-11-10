@@ -7,8 +7,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
-<title>Finanza y Deudas Gregory</title>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.nameform{display:flex;flex-direction:column;gap:6px;margin-top:8px}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
+<title>Finanza y Deudas</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: una sola columna tipo app de bolsillo, con pestañas Hoy / Historial / Deudas. */
@@ -116,8 +116,13 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
 <body>
 <div class="wrap">
   <header>
-    <h1>Finanza y Deudas Gregory</h1>
+    <h1 id="app-title">Finanza y Deudas</h1>
     <p class="sub" id="today-label"></p>
+    <button class="link" id="name-btn" data-action="name-open" style="padding-left:0"></button>
+    <form id="name-form" class="nameform" hidden>
+      <label class="label" for="in-name">Tu nombre</label>
+      <div class="pay"><input id="in-name" type="text" maxlength="30" autocomplete="off" placeholder="Escribe tu nombre"><button class="btn small" type="submit">Guardar</button></div>
+    </form>
   </header>
   <div class="warn" id="warn" role="alert" hidden>No se pudo guardar en este navegador (modo privado o sin espacio). Tus datos se perderán al cerrar. Usa Respaldo de datos para copiarlos.</div>
 
@@ -145,7 +150,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   var KEY = "finanza-deudas-gregory-v1";
   var MAX = 1e9;
   var nf = new Intl.NumberFormat("es-NI", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  var state = { entries: [], debts: [] };
+  var state = { name: "", entries: [], debts: [] };
   var ui = { tab: "hoy", month: ym(new Date()), date: ymd(new Date()), pct: 10, amount: "", toast: "", confirm: null };
   var downloads = null;
 
@@ -165,7 +170,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   function clean(s) {
     if (!s || !Array.isArray(s.entries) || !Array.isArray(s.debts)) return null;
-    var out = { entries: [], debts: [] }, seenDates = {}, seenIds = {};
+    var out = { name: (typeof s.name === "string" ? s.name.trim().slice(0, 30) : ""), entries: [], debts: [] }, seenDates = {}, seenIds = {};
     s.entries.forEach(function (e) {
       if (!e || typeof e.date !== "string" || !DATE_RE.test(e.date) || seenDates[e.date]) return;
       var a = Number(e.amount); if (!isFinite(a) || a <= 0 || a > MAX) return;
@@ -287,7 +292,14 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
       '<button class="btn" type="submit">Guardar deuda</button></form></section>';
   }
 
+  function renderName() {
+    var n = state.name || "";
+    document.getElementById("app-title").textContent = n ? "Finanza y Deudas de " + n : "Finanza y Deudas";
+    document.title = n ? "Finanza y Deudas de " + n : "Finanza y Deudas";
+    document.getElementById("name-btn").textContent = n ? "Cambiar nombre" : "Poner mi nombre";
+  }
   function render() {
+    renderName();
     document.getElementById("today-label").textContent = new Date().toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     var v = document.getElementById("view");
     v.innerHTML = ui.tab === "hoy" ? viewHoy() : ui.tab === "historial" ? viewHistorial() : viewDeudas();
@@ -345,6 +357,10 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
       if (ui.confirm === kd) { state.debts = state.debts.filter(function (x) { return x.id !== t.dataset.id; }); persist(); ui.confirm = null; render(); }
       else armConfirm(t, kd, "Borrar deuda");
     }
+    else if (a === "name-open") {
+      var f = document.getElementById("name-form"); f.hidden = !f.hidden;
+      if (!f.hidden) { var i = document.getElementById("in-name"); i.value = state.name || ""; i.focus(); }
+    }
     else if (a === "bk-toggle") bkToggle();
     else if (a === "bk-copy") bkCopy();
     else if (a === "bk-restore") bkRestore();
@@ -358,7 +374,10 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   document.addEventListener("submit", function (ev) {
     ev.preventDefault();
     var f = ev.target;
-    if (f.id === "debt-form") {
+    if (f.id === "name-form") {
+      state.name = document.getElementById("in-name").value.trim().slice(0, 30);
+      persist(); f.hidden = true; renderName();
+    } else if (f.id === "debt-form") {
       var who = document.getElementById("d-who").value.trim(), total = parseFloat(document.getElementById("d-total").value), due = document.getElementById("d-due").value;
       if (!who || !isFinite(total) || total <= 0 || total > MAX) return;
       state.debts.push({ id: uid(), who: who, total: round2(total), due: due || "", payments: [] });
