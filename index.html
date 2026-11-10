@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E6B4F">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
+<title>Finanza y Deudas Gregory</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: una sola columna tipo app de bolsillo, con pestañas Hoy / Historial / Deudas. */
+:root {
+  --bg: #F2F5F1;
+  --surface: #FFFFFF;
+  --fg: #14211B;
+  --muted: #5C6B63;
+  --line: #D9E1DB;
+  --accent: #0E6B4F;
+  --accent-fg: #FFFFFF;
+  --saved: #A86A0B;
+  --saved-bg: #FBF0DC;
+  --debt: #B1362B;
+  --debt-bg: #FBE7E4;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1713; --surface: #18231D; --fg: #E8F0EA; --muted: #9AAEA2; --line: #2A3A31;
+    --accent: #4CC59A; --accent-fg: #07241A; --saved: #E8B35A; --saved-bg: #2F2512;
+    --debt: #F08A7E; --debt-bg: #381A17; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1713; --surface: #18231D; --fg: #E8F0EA; --muted: #9AAEA2; --line: #2A3A31;
+  --accent: #4CC59A; --accent-fg: #07241A; --saved: #E8B35A; --saved-bg: #2F2512;
+  --debt: #F08A7E; --debt-bg: #381A17; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1, h2, .num { font-family: var(--font-display); }
+h1 { font-size: 1.5rem; line-height: 1.15; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; margin: 0; }
+.sub { color: var(--muted); font-size: .875rem; margin: 4px 0 0; }
+.label { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--line); padding: 4px; border-radius: 12px; }
+.tabs button { border: 0; background: transparent; color: var(--muted); font: 600 .9rem var(--font-body); padding: 10px 6px; border-radius: 9px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+input[type="number"], input[type="date"], input[type="text"] {
+  width: 100%; font: 500 1rem var(--font-body); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-width: 0;
+}
+input.big { font: 700 1.9rem var(--font-display); padding: 12px 14px; font-variant-numeric: tabular-nums; }
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg button { border: 1.5px solid var(--line); background: var(--bg); color: var(--fg); font: 700 1.05rem var(--font-display); padding: 12px; border-radius: 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
+.btn { border: 0; background: var(--accent); color: var(--accent-fg); font: 700 1rem var(--font-body); padding: 14px; border-radius: 10px; cursor: pointer; width: 100%; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn.small { width: auto; padding: 10px 14px; font-size: .9rem; }
+.link { background: none; border: 0; color: var(--muted); font: 600 .85rem var(--font-body); padding: 8px 4px; cursor: pointer; text-decoration: underline; }
+.link.danger { color: var(--debt); }
+
+.split { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.split > div { background: var(--bg); border-radius: 10px; padding: 10px; min-width: 0; }
+.split .num { font-size: 1.1rem; display: block; overflow-wrap: anywhere; }
+.split .saved .num { color: var(--saved); }
+.split .left .num { color: var(--accent); }
+
+.month { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.month > div { background: var(--bg); border-radius: 10px; padding: 12px; min-width: 0; }
+.month .num { font-size: 1.25rem; display: block; overflow-wrap: anywhere; }
+.month .wide { grid-column: 1 / -1; background: var(--accent); color: var(--accent-fg); }
+.month .wide .label { color: inherit; opacity: .8; }
+.month .wide .num { font-size: 1.9rem; }
+.month .saved .num { color: var(--saved); }
+
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.nav button { border: 1px solid var(--line); background: var(--surface); color: var(--fg); width: 44px; height: 44px; border-radius: 10px; font-size: 1.1rem; cursor: pointer; }
+.nav strong { font-family: var(--font-display); text-transform: capitalize; text-align: center; }
+
+.list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .d { font-weight: 600; text-transform: capitalize; }
+.row .meta { color: var(--muted); font-size: .85rem; }
+.row .amt { text-align: right; }
+.row .amt .num { font-size: 1.1rem; }
+.row .actions { grid-column: 1 / -1; display: flex; gap: 4px; }
+.pill { display: inline-block; font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--saved-bg); color: var(--saved); }
+.pill.debt { background: var(--debt-bg); color: var(--debt); }
+.pill.ok { background: var(--bg); color: var(--accent); }
+.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden; grid-column: 1 / -1; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.pay { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.empty { color: var(--muted); text-align: center; padding: 18px 8px; font-size: .95rem; }
+.toast { min-height: 1.3em; font-size: .9rem; font-weight: 600; color: var(--accent); }
+.foot { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Finanza y Deudas Gregory</h1>
+    <p class="sub" id="today-label"></p>
+  </header>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="hoy" aria-selected="true">Hoy</button>
+    <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
+    <button role="tab" data-tab="deudas" aria-selected="false">Deudas</button>
+  </div>
+
+  <main id="view"></main>
+
+  <div class="foot"><button class="link" data-action="bk-toggle">Respaldo de datos</button></div>
+  <section class="panel" id="bk-panel" hidden>
+    <h2>Respaldo de datos</h2>
+    <p class="sub">Copia este texto y guárdalo en tus notas o en WhatsApp. Para restaurar, pégalo aquí y toca Restaurar.</p>
+    <textarea id="bk-text" rows="6" aria-label="Texto del respaldo"></textarea>
+    <button class="btn ghost" data-action="bk-copy">Copiar respaldo</button>
+    <button class="btn" data-action="bk-restore">Restaurar desde el texto</button>
+    <div class="toast" id="bk-msg" role="status"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var KEY = "finanza-deudas-gregory-v1";
+  var nf = new Intl.NumberFormat("es-NI", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  var state = { entries: [], debts: [] };
+  var ui = { tab: "hoy", month: ym(new Date()), date: ymd(new Date()), pct: 10, amount: "", toast: "", confirm: null };
+  var downloads = null;
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function ym(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1); }
+  function parseDate(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2] || 1); }
+  function money(n) { return "C$ " + nf.format(round2(n)); }
+  function round2(n) { return Math.round((+n + Number.EPSILON) * 100) / 100; }
+  function saved(e) { return round2(e.amount * e.pct / 100); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function monthName(m) { return parseDate(m + "-01").toLocaleDateString("es-NI", { month: "long", year: "numeric" }); }
+  function dayName(s) { return parseDate(s).toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "short" }); }
+  function shiftMonth(m, delta) { var d = parseDate(m + "-01"); d.setMonth(d.getMonth() + delta); return ym(d); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) { var s = JSON.parse(raw); if (s && Array.isArray(s.entries) && Array.isArray(s.debts)) state = s; }
+    } catch (e) {}
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  function summary(m) {
+    var list = state.entries.filter(function (e) { return e.date.slice(0, 7) === m; });
+    var earned = 0, sv = 0;
+    list.forEach(function (e) { earned += e.amount; sv += saved(e); });
+    return { list: list, earned: round2(earned), saved: round2(sv), left: round2(earned - sv), days: list.length, avg: list.length ? round2(earned / list.length) : 0 };
+  }
+  function allSaved() { var t = 0; state.entries.forEach(function (e) { t += saved(e); }); return round2(t); }
+  function paid(d) { var t = 0; d.payments.forEach(function (p) { t += p.amount; }); return round2(t); }
+
+  function monthCards(m) {
+    var s = summary(m);
+    return '<div class="month">' +
+      '<div class="wide"><span class="label">Ganado en el mes</span><span class="num">' + money(s.earned) + '</span></div>' +
+      '<div class="saved"><span class="label">Apartado</span><span class="num">' + money(s.saved) + '</span></div>' +
+      '<div><span class="label">Te quedó</span><span class="num">' + money(s.left) + '</span></div>' +
+      '<div><span class="label">Días trabajados</span><span class="num">' + s.days + '</span></div>' +
+      '<div><span class="label">Promedio por día</span><span class="num">' + money(s.avg) + '</span></div>' +
+      '</div>';
+  }
+
+  function viewHoy() {
+    var amt = parseFloat(ui.amount);
+    var valid = isFinite(amt) && amt > 0;
+    var ap = valid ? round2(amt * ui.pct / 100) : 0;
+    var exists = state.entries.some(function (e) { return e.date === ui.date; });
+    return '<section class="panel">' +
+      '<div class="field"><label class="label" for="in-amount">¿Cuánto gané hoy? (C$)</label>' +
+      '<input id="in-amount" class="big" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="' + esc(ui.amount) + '"></div>' +
+      '<div class="field"><span class="label">Apartar para el fondo</span>' +
+      '<div class="seg"><button data-pct="10" aria-pressed="' + (ui.pct === 10) + '">10%</button><button data-pct="20" aria-pressed="' + (ui.pct === 20) + '">20%</button></div></div>' +
+      '<div class="split"><div><span class="label">Gané</span><span class="num" id="p-earn">' + money(valid ? amt : 0) + '</span></div>' +
+      '<div class="saved"><span class="label">Aparto</span><span class="num" id="p-save">' + money(ap) + '</span></div>' +
+      '<div class="left"><span class="label">Me queda</span><span class="num" id="p-left">' + money(valid ? amt - ap : 0) + '</span></div></div>' +
+      '<div class="field"><label class="label" for="in-date">Fecha</label><input id="in-date" type="date" value="' + esc(ui.date) + '"></div>' +
+      '<button class="btn" data-action="save-day" id="btn-save">' + (exists ? "Actualizar este día" : "Guardar el día") + '</button>' +
+      '<div class="toast" id="toast" role="status">' + esc(ui.toast) + '</div>' +
+      '</section>' +
+      '<section class="panel"><h2>' + esc(monthName(ym(new Date()))) + '</h2>' + monthCards(ym(new Date())) +
+      '<div class="meta sub">Fondo apartado en total: <strong class="num">' + money(allSaved()) + '</strong></div></section>';
+  }
+
+  function viewHistorial() {
+    var s = summary(ui.month);
+    var rows = s.list.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }).map(function (e) {
+      var c = ui.confirm === "e" + e.date;
+      return '<li class="row"><div><div class="d">' + esc(dayName(e.date)) + '</div>' +
+        '<div class="meta">Apartaste ' + money(saved(e)) + ' <span class="pill">' + e.pct + '%</span></div></div>' +
+        '<div class="amt"><span class="num">' + money(e.amount) + '</span><div class="meta">quedó ' + money(e.amount - saved(e)) + '</div></div>' +
+        '<div class="actions"><button class="link" data-action="edit-day" data-date="' + e.date + '">Editar</button>' +
+        '<button class="link danger" data-action="del-day" data-date="' + e.date + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar") + '</button></div></li>';
+    }).join("");
+    return '<section class="panel"><div class="nav"><button data-action="prev" aria-label="Mes anterior">&#8592;</button><strong>' + esc(monthName(ui.month)) + '</strong>' +
+      '<button data-action="next" aria-label="Mes siguiente">&#8594;</button></div>' + monthCards(ui.month) + '</section>' +
+      '<section class="panel"><h2>Días registrados</h2>' +
+      (rows ? '<ul class="list">' + rows + '</ul>' : '<div class="empty">No hay días guardados en este mes. Anota lo que ganaste en la pestaña Hoy.</div>') + '</section>';
+  }
+
+  function viewDeudas() {
+    var owed = 0;
+    state.debts.forEach(function (d) { owed += Math.max(0, d.total - paid(d)); });
+    var rows = state.debts.map(function (d) {
+      var p = paid(d), left = round2(Math.max(0, d.total - p)), pct = d.total ? Math.min(100, Math.round(p / d.total * 100)) : 0;
+      var c = ui.confirm === "d" + d.id;
+      var due = d.due ? '<span class="meta"> · vence ' + esc(parseDate(d.due).toLocaleDateString("es-NI", { day: "numeric", month: "short", year: "numeric" })) + '</span>' : "";
+      var late = d.due && left > 0 && d.due < ymd(new Date());
+      return '<li class="row"><div><div class="d" style="text-transform:none">' + esc(d.who) + '</div>' +
+        '<div class="meta">Debes ' + money(d.total) + ' · pagado ' + money(p) + due + '</div></div>' +
+        '<div class="amt"><span class="num">' + money(left) + '</span><div>' +
+        (left === 0 ? '<span class="pill ok">Pagada</span>' : late ? '<span class="pill debt">Vencida</span>' : '<span class="pill debt">Pendiente</span>') + '</div></div>' +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        (left > 0 ? '<form class="pay" data-id="' + d.id + '"><input type="number" inputmode="decimal" min="0" step="0.01" placeholder="Abono en C$" aria-label="Abono para ' + esc(d.who) + '"><button class="btn small" type="submit">Abonar</button></form>' : '') +
+        '<div class="actions"><button class="link danger" data-action="del-debt" data-id="' + d.id + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar deuda") + '</button></div></li>';
+    }).join("");
+    return '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
+      (rows ? '<ul class="list">' + rows + '</ul>' : '<div class="empty">Todavía no hay deudas registradas.</div>') + '</section>' +
+      '<section class="panel"><h2>Agregar deuda</h2>' +
+      '<form id="debt-form" class="panel" style="border:0;padding:0">' +
+      '<div class="field"><label class="label" for="d-who">A quién le debo</label><input id="d-who" type="text" maxlength="60" placeholder="Ej: Tienda, amigo, banco" required></div>' +
+      '<div class="field"><label class="label" for="d-total">Monto (C$)</label><input id="d-total" type="number" inputmode="decimal" min="0.01" step="0.01" required></div>' +
+      '<div class="field"><label class="label" for="d-due">Fecha límite (opcional)</label><input id="d-due" type="date"></div>' +
+      '<button class="btn" type="submit">Guardar deuda</button></form></section>';
+  }
+
+  function render() {
+    document.getElementById("today-label").textContent = new Date().toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    var v = document.getElementById("view");
+    v.innerHTML = ui.tab === "hoy" ? viewHoy() : ui.tab === "historial" ? viewHistorial() : viewDeudas();
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.setAttribute("aria-selected", String(b.dataset.tab === ui.tab)); });
+  }
+
+  function updatePreview() {
+    var amt = parseFloat(ui.amount), valid = isFinite(amt) && amt > 0, ap = valid ? round2(amt * ui.pct / 100) : 0;
+    document.getElementById("p-earn").textContent = money(valid ? amt : 0);
+    document.getElementById("p-save").textContent = money(ap);
+    document.getElementById("p-left").textContent = money(valid ? amt - ap : 0);
+  }
+  function resetConfirmSoon() { clearTimeout(resetConfirmSoon.t); resetConfirmSoon.t = setTimeout(function () { ui.confirm = null; render(); }, 3500); }
+
+  function saveDay() {
+    var amt = parseFloat(ui.amount);
+    if (!isFinite(amt) || amt <= 0) { ui.toast = "Escribe cuánto ganaste."; render(); return; }
+    if (!ui.date) { ui.toast = "Elige una fecha."; render(); return; }
+    amt = round2(amt);
+    var existing = state.entries.filter(function (e) { return e.date === ui.date; })[0];
+    if (existing) { existing.amount = amt; existing.pct = ui.pct; } else { state.entries.push({ date: ui.date, amount: amt, pct: ui.pct }); }
+    persist();
+    ui.toast = (existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ".";
+    ui.amount = ""; ui.date = ymd(new Date());
+    render();
+  }
+
+  document.addEventListener("click", function (ev) {
+    var t = ev.target.closest("button"); if (!t) return;
+    if (t.dataset.tab) { ui.tab = t.dataset.tab; ui.toast = ""; ui.confirm = null; render(); return; }
+    if (t.dataset.pct) { ui.pct = +t.dataset.pct; document.querySelectorAll(".seg button").forEach(function (b) { b.setAttribute("aria-pressed", String(+b.dataset.pct === ui.pct)); }); updatePreview(); return; }
+    var a = t.dataset.action; if (!a) return;
+    if (a === "save-day") saveDay();
+    else if (a === "prev") { ui.month = shiftMonth(ui.month, -1); render(); }
+    else if (a === "next") { ui.month = shiftMonth(ui.month, 1); render(); }
+    else if (a === "edit-day") {
+      var e = state.entries.filter(function (x) { return x.date === t.dataset.date; })[0];
+      if (e) { ui.tab = "hoy"; ui.date = e.date; ui.amount = String(e.amount); ui.pct = e.pct === 20 ? 20 : 10; ui.toast = "Cambia el monto y toca Actualizar."; render(); window.scrollTo(0, 0); }
+    }
+    else if (a === "del-day") {
+      var k = "e" + t.dataset.date;
+      if (ui.confirm === k) { state.entries = state.entries.filter(function (x) { return x.date !== t.dataset.date; }); persist(); ui.confirm = null; }
+      else { ui.confirm = k; resetConfirmSoon(); }
+      render();
+    }
+    else if (a === "del-debt") {
+      var kd = "d" + t.dataset.id;
+      if (ui.confirm === kd) { state.debts = state.debts.filter(function (x) { return x.id !== t.dataset.id; }); persist(); ui.confirm = null; }
+      else { ui.confirm = kd; resetConfirmSoon(); }
+      render();
+    }
+    else if (a === "bk-toggle") bkToggle();
+    else if (a === "bk-copy") bkCopy();
+    else if (a === "bk-restore") bkRestore();
+  });
+
+  document.addEventListener("input", function (ev) {
+    if (ev.target.id === "in-amount") { ui.amount = ev.target.value; updatePreview(); }
+    else if (ev.target.id === "in-date") { ui.date = ev.target.value; var ex = state.entries.some(function (e) { return e.date === ui.date; }); var b = document.getElementById("btn-save"); if (b) b.textContent = ex ? "Actualizar este día" : "Guardar el día"; }
+  });
+
+  document.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var f = ev.target;
+    if (f.id === "debt-form") {
+      var who = document.getElementById("d-who").value.trim(), total = parseFloat(document.getElementById("d-total").value), due = document.getElementById("d-due").value;
+      if (!who || !isFinite(total) || total <= 0) return;
+      state.debts.push({ id: uid(), who: who, total: round2(total), due: due || "", payments: [] });
+      persist(); render();
+    } else if (f.classList.contains("pay")) {
+      var inp = f.querySelector("input"), v = parseFloat(inp.value);
+      if (!isFinite(v) || v <= 0) return;
+      var d = state.debts.filter(function (x) { return x.id === f.dataset.id; })[0];
+      if (d) { d.payments.push({ date: ymd(new Date()), amount: round2(v) }); persist(); render(); }
+    }
+  });
+
+  function bkMsg(t) { document.getElementById("bk-msg").textContent = t; }
+  function bkToggle() {
+    var p = document.getElementById("bk-panel"); p.hidden = !p.hidden;
+    if (!p.hidden) { document.getElementById("bk-text").value = JSON.stringify(state); bkMsg(""); p.scrollIntoView({ block: "nearest" }); }
+  }
+  function bkCopy() {
+    var ta = document.getElementById("bk-text"); ta.value = JSON.stringify(state); ta.select();
+    var ok = function () { bkMsg("Respaldo copiado. Pégalo en tus notas."); };
+    var manual = function () { bkMsg("Mantén presionado el texto y elige Copiar."); };
+    var legacy = function () { try { document.execCommand("copy") ? ok() : manual(); } catch (e) { manual(); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(ok).catch(legacy); else legacy();
+  }
+  function bkRestore() {
+    try {
+      var s = JSON.parse(document.getElementById("bk-text").value);
+      if (s && Array.isArray(s.entries) && Array.isArray(s.debts)) { state = s; persist(); render(); bkMsg("Respaldo restaurado."); }
+      else bkMsg("Ese texto no es un respaldo de la app.");
+    } catch (e) { bkMsg("Ese texto no es un respaldo de la app."); }
+  }
+
+  load(); render();
+})();
+</script>
+</body>
+</html>
