@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.nameform{display:flex;flex-direction:column;gap:6px;margin-top:8px}.hero{gap:4px}.bigbal{font-size:2.3rem;color:var(--accent);overflow-wrap:anywhere}.bigbal.neg,.sub.neg{color:var(--debt)}.month .debtc .num{color:var(--debt)}.month .wide2{grid-column:1 / -1;border:1.5px solid var(--accent)}.month .wide2 .num{font-size:1.6rem;color:var(--accent)}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.nameform{display:flex;flex-direction:column;gap:6px;margin-top:8px}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
 <title>Finanza y Deudas</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" media="print" onload="this.media='all'">
 <style>
@@ -215,18 +215,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var list = state.entries.filter(function (e) { return e.date.slice(0, 7) === m; });
     var earned = 0, sv = 0;
     list.forEach(function (e) { earned += e.amount; sv += saved(e); });
-    var pm = paidMonth(m);
-    return { list: list, earned: round2(earned), saved: round2(sv), paid: pm, left: round2(earned - sv - pm), days: list.length, avg: list.length ? round2(earned / list.length) : 0 };
-  }
-  function paidAll() { var t = 0; state.debts.forEach(function (d) { t += paid(d); }); return round2(t); }
-  function paidMonth(m) { var t = 0; state.debts.forEach(function (d) { d.payments.forEach(function (p) { if (p.date && p.date.slice(0, 7) === m) t += p.amount; }); }); return round2(t); }
-  function balance() { var e = 0, sv = 0; state.entries.forEach(function (x) { e += x.amount; sv += saved(x); }); return round2(e - sv - paidAll()); }
-  function balanceCard() {
-    var b = balance(), neg = b < 0;
-    return '<section class="panel hero" aria-live="polite"><span class="label">Me queda disponible</span>' +
-      '<span class="num bigbal' + (neg ? ' neg' : '') + '" id="bal">' + money(b) + '</span>' +
-      '<span class="sub">Todo lo ganado, menos lo apartado y lo abonado a deudas.</span>' +
-      (neg ? '<span class="sub neg">Abonaste más de lo que has anotado como ganancia.</span>' : '') + '</section>';
+    return { list: list, earned: round2(earned), saved: round2(sv), left: round2(earned - sv), days: list.length, avg: list.length ? round2(earned / list.length) : 0 };
   }
   function allSaved() { var t = 0; state.entries.forEach(function (e) { t += saved(e); }); return round2(t); }
   function owe(d) { var t = d.total; (d.extras || []).forEach(function (x) { t += x.amount; }); return round2(t); }
@@ -238,8 +227,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     return '<div class="month">' +
       '<div class="wide"><span class="label">Ganado en el mes</span><span class="num">' + money(s.earned) + '</span></div>' +
       '<div class="saved"><span class="label">Apartado</span><span class="num">' + money(s.saved) + '</span></div>' +
-      '<div class="debtc"><span class="label">Abonado a deudas</span><span class="num">' + money(s.paid) + '</span></div>' +
-      '<div class="wide2"><span class="label">Te queda en el mes</span><span class="num">' + money(s.left) + '</span></div>' +
+      '<div><span class="label">Te quedó</span><span class="num">' + money(s.left) + '</span></div>' +
       '<div><span class="label">Días trabajados</span><span class="num">' + s.days + '</span></div>' +
       '<div><span class="label">Promedio por día</span><span class="num">' + money(s.avg) + '</span></div>' +
       '</div>';
@@ -250,7 +238,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var valid = isFinite(amt) && amt > 0;
     var ap = valid ? round2(amt * ui.pct / 100) : 0;
     var exists = state.entries.some(function (e) { return e.date === ui.date; });
-    return balanceCard() + '<section class="panel">' +
+    return '<section class="panel">' +
       '<div class="field"><label class="label" for="in-amount">¿Cuánto gané hoy? (C$)</label>' +
       '<input id="in-amount" class="big" type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="' + esc(ui.amount) + '"></div>' +
       '<div class="field"><span class="label">Apartar para el fondo</span>' +
@@ -302,7 +290,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
         '<div class="actions"><button class="link" data-action="more-open" data-id="' + d.id + '">' + (ui.more === d.id ? "Cancelar" : "+ Agregar más a esta deuda") + '</button>' +
         '<button class="link danger" data-action="del-debt" data-id="' + d.id + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar deuda") + '</button></div></li>';
     }).join("");
-    return balanceCard() + '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
+    return '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
       (rows ? '<ul class="list">' + rows + '</ul>' : '<div class="empty">Todavía no hay deudas registradas.</div>') + '</section>' +
       '<section class="panel"><h2>Agregar deuda</h2>' +
       '<form id="debt-form" class="panel" style="border:0;padding:0">' +
@@ -350,7 +338,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var existing = state.entries.filter(function (e) { return e.date === ui.date; })[0];
     if (existing) { existing.amount = amt; existing.pct = ui.pct; } else { state.entries.push({ date: ui.date, amount: amt, pct: ui.pct }); }
     var okSave = persist();
-    ui.toast = (!okSave ? "No se pudo guardar. " : existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ". Disponible ahora: " + money(balance()) + ".";
+    ui.toast = (!okSave ? "No se pudo guardar. " : existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ".";
     ui.amount = ""; ui.date = ymd(new Date());
     render();
   }
