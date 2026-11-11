@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.nameform{display:flex;flex-direction:column;gap:6px;margin-top:8px}.hero{gap:4px}.bigbal{font-size:2.3rem;color:var(--accent);overflow-wrap:anywhere}.bigbal.neg,.sub.neg{color:var(--debt)}.month .debtc .num{color:var(--debt)}.month .wide2{grid-column:1 / -1;border:1.5px solid var(--accent)}.month .wide2 .num{font-size:1.6rem;color:var(--accent)}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}.nameform{display:flex;flex-direction:column;gap:6px;margin-top:8px}.warn{background:var(--debt-bg);color:var(--debt);border-radius:10px;padding:10px 12px;font-weight:600;font-size:.9rem}textarea{width:100%;font:500 .8rem ui-monospace,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}</style>
 <title>Finanza y Deudas</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" media="print" onload="this.media='all'">
 <style>
@@ -151,7 +151,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   var MAX = 1e9;
   var nf = new Intl.NumberFormat("es-NI", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   var state = { name: "", entries: [], debts: [] };
-  var ui = { tab: "hoy", month: ym(new Date()), date: ymd(new Date()), pct: 10, amount: "", toast: "", confirm: null, more: null, today: ymd(new Date()) };
+  var ui = { tab: "hoy", month: ym(new Date()), date: ymd(new Date()), pct: 10, amount: "", toast: "", confirm: null, more: null };
   var downloads = null;
 
   function pad(n) { return String(n).padStart(2, "0"); }
@@ -160,11 +160,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   function parseDate(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2] || 1); }
   function money(n) { return "C$ " + nf.format(round2(n)); }
   function round2(n) { return Math.round((+n + Number.EPSILON) * 100) / 100; }
-  function calcDay(amt, date, pct) {
-    var pd = paidOn(date), net = round2(amt - pd), ap = round2(Math.max(0, net) * pct / 100);
-    return { paid: pd, net: net, ap: ap, left: round2(net - ap) };
-  }
-  function saved(e) { return calcDay(e.amount, e.date, e.pct).ap; }
+  function saved(e) { return round2(e.amount * e.pct / 100); }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function monthName(m) { return parseDate(m + "-01").toLocaleDateString("es-NI", { month: "long", year: "numeric" }); }
   function dayName(s) { return parseDate(s).toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "short" }); }
@@ -219,22 +215,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var list = state.entries.filter(function (e) { return e.date.slice(0, 7) === m; });
     var earned = 0, sv = 0;
     list.forEach(function (e) { earned += e.amount; sv += saved(e); });
-    var pm = paidMonth(m);
-    return { list: list, earned: round2(earned), saved: round2(sv), paid: pm, left: round2(earned - sv - pm), days: list.length, avg: list.length ? round2(earned / list.length) : 0 };
-  }
-  function paidAll() { var t = 0; state.debts.forEach(function (d) { t += paid(d); }); return round2(t); }
-  function paidMonth(m) { var t = 0; state.debts.forEach(function (d) { d.payments.forEach(function (p) { if (p.date && p.date.slice(0, 7) === m) t += p.amount; }); }); return round2(t); }
-  function paidOn(date) { var t = 0; state.debts.forEach(function (d) { d.payments.forEach(function (p) { if (p.date === date) t += p.amount; }); }); return round2(t); }
-  function balanceOn(date) {
-    var e = state.entries.filter(function (x) { return x.date === date; })[0];
-    return round2((e ? e.amount - saved(e) : 0) - paidOn(date));
-  }
-  function balanceCard() {
-    var day = ymd(new Date()), b = balanceOn(day), neg = b < 0, pd = paidOn(day);
-    return '<section class="panel hero" aria-live="polite"><span class="label">Me queda hoy</span>' +
-      '<span class="num bigbal' + (neg ? ' neg' : '') + '" id="bal">' + money(b) + '</span>' +
-      '<span class="sub">Lo que ganaste hoy, menos lo que abonas a deudas' + (pd ? ' (' + money(pd) + ' hoy)' : '') + ', y de lo que sobra se aparta el 10% o 20%. Mañana empieza en cero.</span>' +
-      (neg ? '<span class="sub neg">Abonaste más de lo que anotaste como ganancia de hoy.</span>' : '') + '</section>';
+    return { list: list, earned: round2(earned), saved: round2(sv), left: round2(earned - sv), days: list.length, avg: list.length ? round2(earned / list.length) : 0 };
   }
   function allSaved() { var t = 0; state.entries.forEach(function (e) { t += saved(e); }); return round2(t); }
   function owe(d) { var t = d.total; (d.extras || []).forEach(function (x) { t += x.amount; }); return round2(t); }
@@ -246,8 +227,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     return '<div class="month">' +
       '<div class="wide"><span class="label">Ganado en el mes</span><span class="num">' + money(s.earned) + '</span></div>' +
       '<div class="saved"><span class="label">Apartado</span><span class="num">' + money(s.saved) + '</span></div>' +
-      '<div class="debtc"><span class="label">Abonado a deudas</span><span class="num">' + money(s.paid) + '</span></div>' +
-      '<div class="wide2"><span class="label">Te queda en el mes</span><span class="num">' + money(s.left) + '</span></div>' +
+      '<div><span class="label">Te quedó</span><span class="num">' + money(s.left) + '</span></div>' +
       '<div><span class="label">Días trabajados</span><span class="num">' + s.days + '</span></div>' +
       '<div><span class="label">Promedio por día</span><span class="num">' + money(s.avg) + '</span></div>' +
       '</div>';
@@ -256,17 +236,16 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   function viewHoy() {
     var amt = parseFloat(ui.amount);
     var valid = isFinite(amt) && amt > 0;
-    var cd = calcDay(valid ? amt : 0, ui.date, ui.pct);
+    var ap = valid ? round2(amt * ui.pct / 100) : 0;
     var exists = state.entries.some(function (e) { return e.date === ui.date; });
-    return balanceCard() + '<section class="panel">' +
+    return '<section class="panel">' +
       '<div class="field"><label class="label" for="in-amount">¿Cuánto gané hoy? (C$)</label>' +
       '<input id="in-amount" class="big" type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="' + esc(ui.amount) + '"></div>' +
       '<div class="field"><span class="label">Apartar para el fondo</span>' +
       '<div class="seg"><button data-pct="10" aria-pressed="' + (ui.pct === 10) + '">10%</button><button data-pct="20" aria-pressed="' + (ui.pct === 20) + '">20%</button></div></div>' +
       '<div class="split"><div><span class="label">Gané</span><span class="num" id="p-earn">' + money(valid ? amt : 0) + '</span></div>' +
-      '<div class="saved"><span class="label">Aparto</span><span class="num" id="p-save">' + money(cd.ap) + '</span></div>' +
-      '<div class="left"><span class="label">Quedaría</span><span class="num" id="p-left">' + money(valid ? cd.left : 0) + '</span></div></div>' +
-      '<div class="sub" id="p-note"' + (cd.paid ? '' : ' hidden') + '>' + (cd.paid ? 'Abonos de esta fecha: ' + money(cd.paid) + '. Se restan antes de apartar.' : '') + '</div>' +
+      '<div class="saved"><span class="label">Aparto</span><span class="num" id="p-save">' + money(ap) + '</span></div>' +
+      '<div class="left"><span class="label">Me queda</span><span class="num" id="p-left">' + money(valid ? amt - ap : 0) + '</span></div></div>' +
       '<div class="field"><label class="label" for="in-date">Fecha</label><input id="in-date" type="date" value="' + esc(ui.date) + '"></div>' +
       '<button class="btn" data-action="save-day" id="btn-save">' + (exists ? "Actualizar este día" : "Guardar el día") + '</button>' +
       '<div class="toast" id="toast" role="status">' + esc(ui.toast) + '</div>' +
@@ -280,8 +259,8 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var rows = s.list.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }).map(function (e) {
       var c = ui.confirm === "e" + e.date;
       return '<li class="row"><div><div class="d">' + esc(dayName(e.date)) + '</div>' +
-        '<div class="meta">Apartaste ' + money(saved(e)) + ' <span class="pill">' + e.pct + '%</span>' + (paidOn(e.date) ? ' · Abonaste ' + money(paidOn(e.date)) : '') + '</div></div>' +
-        '<div class="amt"><span class="num">' + money(e.amount) + '</span><div class="meta">quedó ' + money(balanceOn(e.date)) + '</div></div>' +
+        '<div class="meta">Apartaste ' + money(saved(e)) + ' <span class="pill">' + e.pct + '%</span></div></div>' +
+        '<div class="amt"><span class="num">' + money(e.amount) + '</span><div class="meta">quedó ' + money(e.amount - saved(e)) + '</div></div>' +
         '<div class="actions"><button class="link" data-action="edit-day" data-date="' + e.date + '">Editar</button>' +
         '<button class="link danger" data-action="del-day" data-date="' + e.date + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar") + '</button></div></li>';
     }).join("");
@@ -311,7 +290,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
         '<div class="actions"><button class="link" data-action="more-open" data-id="' + d.id + '">' + (ui.more === d.id ? "Cancelar" : "+ Agregar más a esta deuda") + '</button>' +
         '<button class="link danger" data-action="del-debt" data-id="' + d.id + '">' + (c ? "¿Seguro? Toca otra vez" : "Borrar deuda") + '</button></div></li>';
     }).join("");
-    return balanceCard() + '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
+    return '<section class="panel"><div><span class="label">Total que debo</span><div class="num" style="font-size:1.9rem;color:var(--debt)">' + money(owed) + '</div></div>' +
       (rows ? '<ul class="list">' + rows + '</ul>' : '<div class="empty">Todavía no hay deudas registradas.</div>') + '</section>' +
       '<section class="panel"><h2>Agregar deuda</h2>' +
       '<form id="debt-form" class="panel" style="border:0;padding:0">' +
@@ -336,12 +315,10 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
   }
 
   function updatePreview() {
-    var amt = parseFloat(ui.amount), valid = isFinite(amt) && amt > 0, cd = calcDay(valid ? amt : 0, ui.date, ui.pct);
+    var amt = parseFloat(ui.amount), valid = isFinite(amt) && amt > 0, ap = valid ? round2(amt * ui.pct / 100) : 0;
     document.getElementById("p-earn").textContent = money(valid ? amt : 0);
-    document.getElementById("p-save").textContent = money(cd.ap);
-    document.getElementById("p-left").textContent = money(valid ? cd.left : 0);
-    var note = document.getElementById("p-note");
-    if (note) { note.hidden = !cd.paid; note.textContent = cd.paid ? "Abonos de esta fecha: " + money(cd.paid) + ". Se restan antes de apartar." : ""; }
+    document.getElementById("p-save").textContent = money(ap);
+    document.getElementById("p-left").textContent = money(valid ? amt - ap : 0);
   }
   function armConfirm(btn, key, original) {
     var prev = armConfirm.btn;
@@ -361,7 +338,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     var existing = state.entries.filter(function (e) { return e.date === ui.date; })[0];
     if (existing) { existing.amount = amt; existing.pct = ui.pct; } else { state.entries.push({ date: ui.date, amount: amt, pct: ui.pct }); }
     var okSave = persist();
-    ui.toast = (!okSave ? "No se pudo guardar. " : existing ? "Día actualizado. " : "Día guardado. ") + (calcDay(amt, ui.date, ui.pct).paid ? "Abonos descontados: " + money(calcDay(amt, ui.date, ui.pct).paid) + ". " : "") + "Apartaste " + money(calcDay(amt, ui.date, ui.pct).ap) + " y te quedan " + money(calcDay(amt, ui.date, ui.pct).left) + ". Hoy te queda: " + money(balanceOn(ymd(new Date()))) + ".";
+    ui.toast = (!okSave ? "No se pudo guardar. " : existing ? "Día actualizado. " : "Día guardado. ") + "Apartaste " + money(round2(amt * ui.pct / 100)) + " y te quedan " + money(amt - round2(amt * ui.pct / 100)) + ".";
     ui.amount = ""; ui.date = ymd(new Date());
     render();
   }
@@ -403,7 +380,7 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
 
   document.addEventListener("input", function (ev) {
     if (ev.target.id === "in-amount") { ui.amount = ev.target.value; updatePreview(); }
-    else if (ev.target.id === "in-date") { ui.date = ev.target.value; updatePreview(); var ex = state.entries.some(function (e) { return e.date === ui.date; }); var b = document.getElementById("btn-save"); if (b) b.textContent = ex ? "Actualizar este día" : "Guardar el día"; }
+    else if (ev.target.id === "in-date") { ui.date = ev.target.value; var ex = state.entries.some(function (e) { return e.date === ui.date; }); var b = document.getElementById("btn-save"); if (b) b.textContent = ex ? "Actualizar este día" : "Guardar el día"; }
   });
 
   document.addEventListener("submit", function (ev) {
@@ -464,15 +441,11 @@ input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); ou
     if (ev.key !== KEY || !ev.newValue) return;
     try { var s = clean(JSON.parse(ev.newValue)); if (s) { state = s; render(); } } catch (e) {}
   });
-  function checkDay() {
-    var nowD = ymd(new Date());
-    if (ui.today === nowD) return;
-    ui.today = nowD;
-    if (!ui.amount && ui.tab === "hoy") ui.date = nowD;
-    ui.toast = ""; render();
-  }
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") checkDay(); });
-  setInterval(checkDay, 30000);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    document.getElementById("today-label").textContent = new Date().toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    if (ui.tab === "hoy" && !ui.amount && ui.date !== ymd(new Date())) { ui.date = ymd(new Date()); ui.toast = ""; render(); }
+  });
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
   }
